@@ -20,32 +20,40 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { APP_NAME } from '@/lib/branding'
+import { setLanguage } from '@/lib/i18n'
 
 // Phase 1 — core nav items (fully functional)
 const coreNavItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: Plus, label: 'New Proposal', path: '/proposals/new' },
-  { icon: FileText, label: 'Proposals', path: '/proposals' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', labelEs: 'Panel Principal', path: '/dashboard' },
+  { icon: Plus, label: 'New Proposal', labelEs: 'Nueva Propuesta', path: '/proposals/new' },
+  { icon: FileText, label: 'Proposals', labelEs: 'Propuestas', path: '/proposals' },
+  { icon: Settings, label: 'Settings', labelEs: 'Configuración', path: '/settings' },
 ]
 
 // Coming Soon — visible but locked
 const comingSoonItems = [
-  { icon: GitBranch, label: 'Pipeline' },
-  { icon: Bell, label: 'Follow-ups' },
-  { icon: CreditCard, label: 'Invoices' },
-  { icon: Calendar, label: 'Schedule' },
-  { icon: Star, label: 'Reviews' },
-  { icon: QrCode, label: 'QR Codes' },
-  { icon: Sparkles, label: 'AI Coach' },
+  { icon: GitBranch, label: 'Pipeline', labelEs: 'Pipeline' },
+  { icon: Bell, label: 'Follow-ups', labelEs: 'Seguimientos' },
+  { icon: CreditCard, label: 'Invoices', labelEs: 'Facturas' },
+  { icon: Calendar, label: 'Schedule', labelEs: 'Agenda' },
+  { icon: Star, label: 'Reviews', labelEs: 'Reseñas' },
+  { icon: QrCode, label: 'QR Codes', labelEs: 'Códigos QR' },
+  { icon: Sparkles, label: 'AI Coach', labelEs: 'Asesor IA' },
 ]
 
 export function Sidebar() {
   const location = useLocation()
   const { user } = useUser()
   const { signOut } = useClerk()
+  const { i18n } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const isEs = i18n.language === 'es'
+
+  const toggleLang = () => {
+    setLanguage(isEs ? 'en' : 'es')
+  }
 
   return (
     <>
@@ -103,14 +111,14 @@ export function Sidebar() {
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                {item.label}
+                {isEs ? item.labelEs : item.label}
               </Link>
             )
           })}
 
           {/* Coming Soon divider */}
           <div className="pt-4 pb-2 px-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30">Coming Soon</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{isEs ? 'Próximamente' : 'Coming Soon'}</p>
           </div>
 
           {comingSoonItems.map((item) => (
@@ -119,7 +127,7 @@ export function Sidebar() {
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/30 cursor-not-allowed"
             >
               <item.icon className="h-5 w-5" />
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1">{isEs ? item.labelEs : item.label}</span>
               <Lock className="h-3 w-3" />
             </div>
           ))}
@@ -139,12 +147,20 @@ export function Sidebar() {
               </p>
             </div>
           </div>
+          {/* Language toggle */}
+          <button
+            onClick={toggleLang}
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors mb-1"
+          >
+            <span className="text-base">🌐</span>
+            {isEs ? 'Switch to English' : 'Cambiar a Español'}
+          </button>
           <button
             onClick={() => signOut()}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
           >
             <LogOut className="h-4 w-4" />
-            Sign Out
+            {isEs ? 'Cerrar Sesión' : 'Sign Out'}
           </button>
         </div>
       </aside>
