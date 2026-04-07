@@ -10,7 +10,7 @@ C) Re-engagement (30+ days, 2+ prior outreach)
 import logging
 from datetime import datetime
 
-from config import Config
+from outreach_config import Config
 
 logger = logging.getLogger(__name__)
 

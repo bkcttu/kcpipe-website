@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 
 import requests
 
-from config import Config
-from database import get_db, upsert_contact, get_contact_by_operator
+from outreach_config import Config
+from outreach_db import get_db, upsert_contact, get_contact_by_operator
 
 logger = logging.getLogger(__name__)
 

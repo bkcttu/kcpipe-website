@@ -6,7 +6,7 @@ Uses Claude API with web search tool.
 import logging
 from datetime import datetime
 
-from config import Config
+from outreach_config import Config
 
 logger = logging.getLogger(__name__)
 

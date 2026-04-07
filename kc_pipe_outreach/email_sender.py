@@ -8,8 +8,8 @@ import logging
 import msal
 import requests
 
-from config import Config
-from database import (
+from outreach_config import Config
+from outreach_db import (
     get_approved_outreach, mark_outreach_sent, mark_contact_sent,
     log_sent_email
 )

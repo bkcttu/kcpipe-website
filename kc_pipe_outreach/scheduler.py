@@ -20,7 +20,7 @@ def monday_outreach_run():
     from contact_enricher import enrich_contacts
     from email_generator import generate_email
     from market_intel import get_market_update
-    from database import (
+    from outreach_db import (
         save_rig_report, was_contacted_recently, create_outreach,
         get_contacts_needing_followup, get_contacts_for_reengagement
     )

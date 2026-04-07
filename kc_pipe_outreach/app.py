@@ -11,8 +11,8 @@ from flask import (
     Flask, render_template, request, jsonify, redirect, url_for, flash
 )
 
-from config import Config
-from database import (
+from outreach_config import Config
+from outreach_db import (
     init_db, get_pending_outreach, approve_outreach, skip_outreach,
     update_outreach_email, get_approved_outreach, get_sent_history,
     get_monthly_stats, get_no_contact_operators, update_contact_notes,
@@ -152,7 +152,7 @@ def run_report():
     try:
         from enverus_puller import pull_enverus_report, filter_targets
         from contact_enricher import enrich_contacts
-        from database import save_rig_report, was_contacted_recently
+        from outreach_db import save_rig_report, was_contacted_recently
 
         week_of = _current_week()
 
@@ -190,7 +190,7 @@ def run_report():
                 email_count += 1
 
         # Also generate follow-up emails for existing contacts
-        from database import get_contacts_needing_followup, get_contacts_for_reengagement
+        from outreach_db import get_contacts_needing_followup, get_contacts_for_reengagement
 
         followups = get_contacts_needing_followup()
         for contact in followups:
@@ -238,7 +238,7 @@ def upload_csv():
     try:
         from enverus_puller import parse_csv, filter_targets
         from contact_enricher import enrich_contacts
-        from database import save_rig_report, was_contacted_recently
+        from outreach_db import save_rig_report, was_contacted_recently
 
         csv_content = file.read().decode('utf-8')
         records = parse_csv(csv_content)

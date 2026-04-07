@@ -2,7 +2,7 @@
 
 import sqlite3
 from datetime import datetime, timedelta
-from config import Config
+from outreach_config import Config
 
 
 def get_db():
