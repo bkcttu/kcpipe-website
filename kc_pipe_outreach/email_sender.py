@@ -59,8 +59,29 @@ def send_email(to_email, subject, body, save_to_sent=True):
     except RuntimeError as e:
         return {'success': False, 'error': str(e)}
 
-    # Convert plain text body to simple HTML (preserve line breaks)
-    html_body = body.replace('\n', '<br>\n')
+    # Convert plain text body to HTML with Byron's signature
+    # Strip the plain text signature (email_generator adds it) before adding HTML version
+    sig_marker = "Byron Courts\nKC Pipe LP\n"
+    if sig_marker in body:
+        body_text = body[:body.index(sig_marker)].rstrip()
+    else:
+        body_text = body
+
+    html_body = body_text.replace('\n', '<br>\n')
+    html_body += '''<br><br>
+<table cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="padding-right: 15px; vertical-align: top;">
+<img src="https://i.imgur.com/4OJUP1r.png" alt="KC Pipe" width="80">
+</td>
+<td style="vertical-align: top; font-family: Arial, sans-serif; font-size: 14px;">
+<strong style="font-size: 15px;">BYRON COURTS</strong><br>
+<span style="color: #666;">c: (432) 230-5579 &nbsp;|&nbsp; o: (432) 563-0500</span><br>
+<a href="mailto:bcourts@kcpipe.com" style="color: #c00;">bcourts@kcpipe.com</a><br>
+<a href="http://www.kcpipe.com" style="color: #c00;">www.kcpipe.com</a>
+</td>
+</tr>
+</table>'''
 
     url = f"https://graph.microsoft.com/v1.0/users/{Config.SENDER_EMAIL}/sendMail"
     headers = {

@@ -182,8 +182,8 @@ def _parse_email_response(text):
 
     body = body.strip()
 
-    # Append CAN-SPAM footer
-    body += f"\n\n---\n{Config.BUSINESS_ADDRESS}"
+    # Append signature
+    body += "\n\nByron Courts\nKC Pipe LP\nc: (432) 230-5579 | o: (432) 563-0500\nbcourts@kcpipe.com | www.kcpipe.com"
 
     return {'subject': subject, 'body': body}
 
