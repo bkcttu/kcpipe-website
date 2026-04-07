@@ -85,6 +85,9 @@
             <div class="card-contact">
                 <strong>{{ item.contact_name or 'Unknown' }}</strong>
                 {% if item.contact_title %}, {{ item.contact_title }}{% endif %}
+                {% if item.linkedin_url %}
+                    <a href="{{ item.linkedin_url }}" target="_blank" style="color:var(--info);margin-left:0.5rem;font-size:0.8rem">LinkedIn</a>
+                {% endif %}
                 <br>
                 {{ item.contact_email or 'No email' }}
                 {% if item.last_contacted %}

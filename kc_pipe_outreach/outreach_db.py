@@ -222,7 +222,8 @@ def get_pending_outreach(week_of=None):
         rows = conn.execute("""
             SELECT oq.*, c.operator, c.contact_name, c.contact_title,
                    c.contact_email, c.email_confidence, c.rig_count,
-                   c.outreach_count, c.last_contacted, c.notes, c.source
+                   c.outreach_count, c.last_contacted, c.notes, c.source,
+                   c.linkedin_url
             FROM outreach_queue oq
             JOIN contacts c ON oq.contact_id = c.id
             WHERE oq.status = 'pending' AND oq.week_of = ?
@@ -232,7 +233,8 @@ def get_pending_outreach(week_of=None):
         rows = conn.execute("""
             SELECT oq.*, c.operator, c.contact_name, c.contact_title,
                    c.contact_email, c.email_confidence, c.rig_count,
-                   c.outreach_count, c.last_contacted, c.notes, c.source
+                   c.outreach_count, c.last_contacted, c.notes, c.source,
+                   c.linkedin_url
             FROM outreach_queue oq
             JOIN contacts c ON oq.contact_id = c.id
             WHERE oq.status = 'pending'
