@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KC Pipe — Monday Outreach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>KC PIPE <span>— MONDAY OUTREACH</span></h1>
+    <div class="header-week">Week of {{ week_of }}</div>
+</div>
+
+<!-- Action Bar -->
+<div class="action-bar">
+    <form action="{{ url_for('run_report') }}" method="post" style="display:inline">
+        <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<span class=spinner></span> Running...';this.form.submit()">
+            Run Report
+        </button>
+    </form>
+    <form action="{{ url_for('send_all') }}" method="post" style="display:inline" id="send-all-form">
+        <button type="submit" class="btn btn-success" onclick="return confirm('Send all approved emails?')">
+            Send All Approved
+        </button>
+    </form>
+    <a href="{{ url_for('export_csv', week=week_of) }}" class="btn btn-outline">Export CSV</a>
+    <button class="btn btn-outline" onclick="document.getElementById('upload-modal').classList.add('active')">
+        Upload CSV
+    </button>
+    <a href="{{ url_for('sent_history') }}" class="btn btn-outline">Sent History</a>
+</div>
+
+<!-- Flash Messages -->
+<div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('targets')">New Targets ({{ pending|length }})</button>
+        <button class="tab" onclick="showTab('no-contact')">No Contact Found ({{ no_contact|length }})</button>
+        <button class="tab" onclick="showTab('approved-tab')">Approved ({{ approved|length }})</button>
+    </div>
+
+    <!-- New Targets Tab -->
+    <div id="targets-tab">
+        <div class="section-header">
+            <h2>Outreach Queue</h2>
+            <span class="badge">{{ pending|length }} emails ready</span>
+        </div>
+
+        {% if not pending %}
+        <div class="card" style="text-align:center;color:var(--text-muted);padding:2rem">
+            No pending outreach this week. Click "Run Report" to pull new targets.
+        </div>
+        {% endif %}
+
+        {% for item in pending %}
+        <div class="card" id="card-{{ item.id }}">
+            <div class="card-header">
+                <div>
+                    <span class="card-operator">{{ item.operator }}</span>
+                    <span class="email-type email-type-{{ item.email_type }}">{{ item.email_type|replace('_', ' ') }}</span>
+                </div>
+                <div class="card-meta">
+                    <span>{{ item.rig_count or '?' }} rigs</span>
+                    <span class="confidence confidence-{{ item.email_confidence or 'manual' }}">
+                        {{ item.email_confidence or 'unknown' }}
+                    </span>
+                    <span>via {{ item.source or '?' }}</span>
+                </div>
+            </div>
+
+            <div class="card-contact">
+                <strong>{{ item.contact_name or 'Unknown' }}</strong>
+                {% if item.contact_title %}, {{ item.contact_title }}{% endif %}
+                <br>
+                {{ item.contact_email or 'No email' }}
+                {% if item.last_contacted %}
+                    &middot; Last contacted: {{ item.last_contacted }}
+                {% endif %}
+            </div>
+
+            <div class="card-actions">
+                <button class="btn btn-sm btn-outline" onclick="viewEmail({{ item.id }}, {{ item|tojson }})">
+                    View Email
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="editEmail({{ item.id }}, {{ item|tojson }})">
+                    Edit
+                </button>
+                <button class="btn btn-sm btn-success" onclick="approveItem({{ item.id }})">
+                    Approve
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="skipItem({{ item.id }})" style="color:var(--text-muted)">
+                    Skip
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="regenerateEmail({{ item.id }})" title="Get new AI draft">
+                    Regenerate
+                </button>
+            </div>
+
+            {% if item.notes %}
+            <div style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted)">
+                Note: {{ item.notes }}
+            </div>
+            {% endif %}
+
+            <input class="notes-input" placeholder="Add a note..."
+                   value="{{ item.notes or '' }}"
+                   onchange="saveNotes({{ item.contact_id }}, this.value)">
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- No Contact Found Tab -->
+    <div id="no-contact-tab" style="display:none">
+        <div class="section-header">
+            <h2>Contact Not Found — Manual Research Needed</h2>
+            <span class="badge">{{ no_contact|length }}</span>
+        </div>
+
+        {% if not no_contact %}
+        <div class="card" style="text-align:center;color:var(--text-muted);padding:2rem">
+            All operators have contacts. Nice.
+        </div>
+        {% endif %}
+
+        <ul class="no-contact-list">
+        {% for op in no_contact %}
+            <li class="no-contact-item" id="nocontact-{{ loop.index }}">
+                <div>
+                    <strong>{{ op.operator }}</strong>
+                    &middot; {{ op.rig_count or '?' }} rigs
+                    {% if op.county %} &middot; {{ op.county }}{% endif %}
+                </div>
+                <div style="display:flex;gap:0.5rem">
+                    <button class="btn btn-sm btn-outline"
+                            onclick="retryEnrich('{{ op.operator }}', {{ op.rig_count or 0 }}, {{ loop.index }})">
+                        Retry Search
+                    </button>
+                    <button class="btn btn-sm btn-primary"
+                            onclick="showAddContact('{{ op.operator }}', {{ op.rig_count or 0 }})">
+                        Add Contact
+                    </button>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Approved Tab -->
+    <div id="approved-tab-tab" style="display:none">
+        <div class="section-header">
+            <h2>Approved — Ready to Send</h2>
+            <span class="badge">{{ approved|length }}</span>
+        </div>
+
+        {% for item in approved %}
+        <div class="card approved">
+            <div class="card-header">
+                <span class="card-operator">{{ item.operator }}</span>
+                <span class="email-type email-type-{{ item.email_type }}">{{ item.email_type|replace('_', ' ') }}</span>
+            </div>
+            <div class="card-contact">
+                <strong>{{ item.contact_name }}</strong> &middot; {{ item.contact_email }}
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-muted)">
+                Subject: {{ item.subject }}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not approved %}
+        <div class="card" style="text-align:center;color:var(--text-muted);padding:2rem">
+            No approved emails yet. Review and approve from the queue above.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent History -->
+    {% if recent_history %}
+    <div style="margin-top:2rem">
+        <div class="section-header">
+            <h2>Recently Sent</h2>
+            <a href="{{ url_for('sent_history') }}" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Contact</th>
+                    <th>Subject</th>
+                    <th>Sent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in recent_history %}
+                <tr>
+                    <td style="color:var(--text-primary)">{{ h.operator }}</td>
+                    <td>{{ h.contact_name }}</td>
+                    <td>{{ h.subject[:50] }}{% if h.subject|length > 50 %}...{% endif %}</td>
+                    <td>{{ h.sent_at[:10] if h.sent_at else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+    <div class="stat">
+        <div class="stat-value">{{ stats.sent_count }}</div>
+        <div class="stat-label">Sent This Month</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value">{{ stats.unique_contacts }}</div>
+        <div class="stat-label">Unique Contacts</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value">{{ pending|length }}</div>
+        <div class="stat-label">Pending Review</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value">{{ approved|length }}</div>
+        <div class="stat-label">Approved</div>
+    </div>
+</div>
+
+<!-- Email Preview Modal -->
+<div class="modal-overlay" id="email-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Email Preview</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div id="modal-meta" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem"></div>
+        <div class="form-group">
+            <label>Subject</label>
+            <input type="text" id="modal-subject" readonly>
+        </div>
+        <div class="form-group">
+            <label>Body</label>
+            <textarea id="modal-body" readonly></textarea>
+        </div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
+            <button class="btn btn-outline" onclick="closeModal()">Close</button>
+            <button class="btn btn-primary" id="modal-edit-btn" onclick="enableEdit()">Edit</button>
+            <button class="btn btn-success" id="modal-save-btn" style="display:none" onclick="saveEdit()">Save</button>
+            <button class="btn btn-success" id="modal-approve-btn" onclick="approveFromModal()">Approve</button>
+        </div>
+    </div>
+</div>
+
+<!-- CSV Upload Modal -->
+<div class="modal-overlay" id="upload-modal">
+    <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+            <h3>Upload Enverus CSV</h3>
+            <button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('active')">&times;</button>
+        </div>
+        <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem">
+            Upload a CSV exported from Enverus with columns: Operator, Rig Count, County, Formation
+        </p>
+        <form action="{{ url_for('upload_csv') }}" method="post" enctype="multipart/form-data">
+            <div class="upload-area" onclick="this.querySelector('input').click()">
+                <input type="file" name="csv_file" accept=".csv" onchange="this.closest('.upload-area').querySelector('span').textContent=this.files[0].name">
+                <span style="color:var(--text-muted)">Click to select CSV file</span>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Import &amp; Process</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal-overlay" id="add-contact-modal">
+    <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+            <h3>Add Contact Manually</h3>
+            <button class="modal-close" onclick="document.getElementById('add-contact-modal').classList.remove('active')">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>Operator</label>
+            <input type="text" id="add-operator" readonly>
+        </div>
+        <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" id="add-name" placeholder="Jane Smith">
+        </div>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="add-title" placeholder="Tubular Coordinator">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="add-email" placeholder="jsmith@operator.com">
+        </div>
+        <div class="form-group">
+            <label>LinkedIn URL (optional)</label>
+            <input type="text" id="add-linkedin" placeholder="https://linkedin.com/in/...">
+        </div>
+        <input type="hidden" id="add-rig-count">
+        <button class="btn btn-primary" style="width:100%" onclick="submitAddContact()">
+            Add &amp; Generate Email
+        </button>
+    </div>
+</div>
+
+<script>
+let currentOutreachId = null;
+
+function showTab(name) {
+    document.querySelectorAll('[id$="-tab"]').forEach(el => {
+        if (el.id !== name + '-tab') el.style.display = 'none';
+    });
+    // Handle the approved tab special naming
+    const tabEl = document.getElementById(name + '-tab');
+    if (tabEl) tabEl.style.display = '';
+
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function viewEmail(id, item) {
+    currentOutreachId = id;
+    document.getElementById('modal-title').textContent = item.operator;
+    document.getElementById('modal-meta').innerHTML =
+        `To: <strong>${item.contact_name || 'Unknown'}</strong> (${item.contact_email || 'no email'}) &middot; Type: ${item.email_type}`;
+    document.getElementById('modal-subject').value = item.subject || '';
+    document.getElementById('modal-body').value = item.body || '';
+    document.getElementById('modal-subject').readOnly = true;
+    document.getElementById('modal-body').readOnly = true;
+    document.getElementById('modal-edit-btn').style.display = '';
+    document.getElementById('modal-save-btn').style.display = 'none';
+    document.getElementById('email-modal').classList.add('active');
+}
+
+function editEmail(id, item) {
+    viewEmail(id, item);
+    enableEdit();
+}
+
+function enableEdit() {
+    document.getElementById('modal-subject').readOnly = false;
+    document.getElementById('modal-body').readOnly = false;
+    document.getElementById('modal-edit-btn').style.display = 'none';
+    document.getElementById('modal-save-btn').style.display = '';
+    document.getElementById('modal-subject').focus();
+}
+
+function saveEdit() {
+    const subject = document.getElementById('modal-subject').value;
+    const body = document.getElementById('modal-body').value;
+    fetch(`/edit/${currentOutreachId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({subject, body})
+    }).then(r => r.json()).then(() => {
+        document.getElementById('modal-subject').readOnly = true;
+        document.getElementById('modal-body').readOnly = true;
+        document.getElementById('modal-edit-btn').style.display = '';
+        document.getElementById('modal-save-btn').style.display = 'none';
+    });
+}
+
+function approveItem(id) {
+    fetch(`/approve/${id}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(() => {
+            const card = document.getElementById(`card-${id}`);
+            card.classList.add('approved');
+            card.style.opacity = '0.6';
+        });
+}
+
+function approveFromModal() {
+    approveItem(currentOutreachId);
+    closeModal();
+}
+
+function skipItem(id) {
+    fetch(`/skip/${id}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(() => {
+            const card = document.getElementById(`card-${id}`);
+            card.classList.add('skipped');
+        });
+}
+
+function regenerateEmail(id) {
+    const btn = event.target;
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+    fetch(`/regenerate/${id}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = 'Regenerate';
+            btn.disabled = false;
+            if (data.subject) {
+                // Show the new email in modal
+                viewEmail(id, {
+                    operator: document.querySelector(`#card-${id} .card-operator`).textContent,
+                    contact_name: '',
+                    contact_email: '',
+                    email_type: '',
+                    subject: data.subject,
+                    body: data.body
+                });
+            }
+        });
+}
+
+function saveNotes(contactId, notes) {
+    fetch(`/notes/${contactId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({notes})
+    });
+}
+
+function closeModal() {
+    document.getElementById('email-modal').classList.remove('active');
+}
+
+function retryEnrich(operator, rigCount, idx) {
+    const btn = event.target;
+    btn.innerHTML = '<span class="spinner"></span> Searching...';
+    btn.disabled = true;
+    fetch('/retry-enrich', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({operator, rig_count: rigCount})
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'found') {
+            const item = document.getElementById(`nocontact-${idx}`);
+            item.innerHTML = `<div><strong>${operator}</strong> &mdash; Found: ${data.contact.name} (${data.contact.email})</div><span class="confidence confidence-verified">added</span>`;
+        } else {
+            btn.innerHTML = 'Not Found';
+            btn.disabled = false;
+        }
+    });
+}
+
+function showAddContact(operator, rigCount) {
+    document.getElementById('add-operator').value = operator;
+    document.getElementById('add-rig-count').value = rigCount;
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-title').value = '';
+    document.getElementById('add-email').value = '';
+    document.getElementById('add-linkedin').value = '';
+    document.getElementById('add-contact-modal').classList.add('active');
+}
+
+function submitAddContact() {
+    const data = {
+        operator: document.getElementById('add-operator').value,
+        rig_count: parseInt(document.getElementById('add-rig-count').value) || null,
+        contact_name: document.getElementById('add-name').value,
+        contact_title: document.getElementById('add-title').value,
+        contact_email: document.getElementById('add-email').value,
+        linkedin_url: document.getElementById('add-linkedin').value,
+    };
+    if (!data.contact_email) {
+        alert('Email is required');
+        return;
+    }
+    fetch('/add-contact', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        document.getElementById('add-contact-modal').classList.remove('active');
+        location.reload();
+    });
+}
+
+// Close modals on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('active');
+    });
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+    }
+});
+</script>
+
+</body>
+</html>

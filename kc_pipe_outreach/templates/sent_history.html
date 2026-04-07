@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KC Pipe — Sent History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="header">
+    <h1>KC PIPE <span>— SENT HISTORY</span></h1>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline">Back to Dashboard</a>
+</div>
+
+<div class="container">
+    <div class="section-header">
+        <h2>All Sent Emails</h2>
+    </div>
+
+    {% if not history %}
+    <div class="card" style="text-align:center;color:var(--text-muted);padding:2rem">
+        No emails sent yet.
+    </div>
+    {% else %}
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Operator</th>
+                <th>Contact</th>
+                <th>Email</th>
+                <th>Subject</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in history %}
+            <tr>
+                <td>{{ h.sent_at[:16] if h.sent_at else '' }}</td>
+                <td style="color:var(--text-primary);font-weight:600">{{ h.operator }}</td>
+                <td>{{ h.contact_name }}</td>
+                <td>{{ h.contact_email }}</td>
+                <td>{{ h.subject }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="display:flex;gap:1rem;justify-content:center;margin-top:1.5rem">
+        {% if page > 1 %}
+        <a href="{{ url_for('sent_history', page=page-1) }}" class="btn btn-outline">Previous</a>
+        {% endif %}
+        <span style="color:var(--text-muted);line-height:2.2">Page {{ page }}</span>
+        {% if history|length == 25 %}
+        <a href="{{ url_for('sent_history', page=page+1) }}" class="btn btn-outline">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
