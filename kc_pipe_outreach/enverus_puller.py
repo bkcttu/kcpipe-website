@@ -251,6 +251,99 @@ def _deduplicate(records):
     return unique
 
 
+def parse_enverus_text(text):
+    """
+    Parse Enverus 'Permit Activity by Operators' text report.
+
+    This is the format you get when you copy-paste from the Enverus web report
+    or when the Excel export is pasted as text.
+    """
+    import re
+
+    records = []
+    current_county = ''
+    current_operator = ''
+    current_formation = ''
+    current_permit_date = ''
+    current_well_type = ''
+
+    lines = text.split('\n')
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Match county headers like "EDDY CountyCount: 40 Total" or "MIDLAND CountyCount: 16 Total"
+        county_match = re.match(r'^([A-Z]+)\s+County\s*Count:\s*(\d+)\s*Total', line)
+        if county_match:
+            current_county = county_match.group(1).title()
+            continue
+
+        # Match operator lines like "Operator: EOG RESOURCES INCKRISTINA AGEE432-686-6996"
+        # or "Operator: PERMIAN RESOURCES OPERATING, LLCBRANDON MARTIN432-695-4222"
+        op_match = re.match(r'Operator:\s*(.+?)(?:[A-Z][a-z]+\s+[A-Z][a-z]+\d|\s*$)', line)
+        if not op_match:
+            # Try alternate pattern — operator name followed by contact name and phone
+            op_match = re.match(r'Operator:\s*(.+?)(?:[A-Z]{2,}[a-z])', line)
+        if not op_match:
+            # Simpler: just grab everything after "Operator: " up to a phone-number-like pattern
+            op_match = re.match(r'Operator:\s*(.+?)(?:\d{3}[-.]?\d{3}[-.]?\d{4})', line)
+        if not op_match:
+            op_match = re.match(r'Operator:\s*(.+)', line)
+
+        if op_match:
+            raw_op = op_match.group(1).strip()
+            # Clean up: remove trailing contact name (usually ALLCAPS first + mixed case last)
+            # Pattern: operator name ends, then contact name starts
+            # e.g., "EOG RESOURCES INCKRISTINA AGEE" -> "EOG RESOURCES INC"
+            # Look for where uppercase company name transitions to a personal name
+            clean = re.match(
+                r'^(.*?(?:INC\.?|LLC\.?|LP\.?|CORP\.?|CO\.?|LTD\.?|COMPANY|OPERATING|RESOURCES|ENERGY|USA)[\s.,]*)',
+                raw_op, re.IGNORECASE
+            )
+            if clean:
+                current_operator = clean.group(1).strip().rstrip(',').rstrip('.')
+            else:
+                # Fallback: just use as-is but try to trim contact name
+                current_operator = re.sub(r'[A-Z][a-z]+\s+[A-Z][a-z]+\s*$', '', raw_op).strip()
+                if not current_operator:
+                    current_operator = raw_op
+
+            # Normalize common suffixes
+            current_operator = current_operator.rstrip(',').rstrip('.').strip()
+            continue
+
+        # Match formation line
+        form_match = re.search(r'Formation:\s*([^\t]+)', line)
+        if form_match:
+            current_formation = form_match.group(1).strip()
+
+        # Match approved date
+        date_match = re.search(r'Approved Date:\s*([\d-]+)', line)
+        if date_match:
+            current_permit_date = date_match.group(1).strip()
+
+        # Match well type
+        wt_match = re.search(r'Well Type:\s*([^\t\s]+(?:\s*&\s*[^\t\s]+)?)', line)
+        if wt_match:
+            current_well_type = wt_match.group(1).strip()
+
+            # When we hit well type, we have a complete record
+            if current_operator:
+                records.append({
+                    'operator': current_operator,
+                    'rig_count': 1,  # Will aggregate later
+                    'county': current_county,
+                    'formation': current_formation,
+                    'permit_date': current_permit_date or None,
+                    'well_type': current_well_type,
+                })
+
+    # Aggregate by operator (count permits as proxy for activity level)
+    return _aggregate_by_operator(records)
+
+
 def _safe_int(val):
     """Safely convert to int, default 1."""
     try:

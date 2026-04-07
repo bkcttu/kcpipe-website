@@ -27,6 +27,9 @@
         </button>
     </form>
     <a href="{{ url_for('export_csv', week=week_of) }}" class="btn btn-outline">Export CSV</a>
+    <button class="btn btn-primary" onclick="document.getElementById('paste-modal').classList.add('active')">
+        Paste Enverus Report
+    </button>
     <button class="btn btn-outline" onclick="document.getElementById('upload-modal').classList.add('active')">
         Upload CSV
     </button>
@@ -258,6 +261,26 @@
             <button class="btn btn-success" id="modal-save-btn" style="display:none" onclick="saveEdit()">Save</button>
             <button class="btn btn-success" id="modal-approve-btn" onclick="approveFromModal()">Approve</button>
         </div>
+    </div>
+</div>
+
+<!-- Paste Enverus Report Modal -->
+<div class="modal-overlay" id="paste-modal">
+    <div class="modal" style="max-width:700px">
+        <div class="modal-header">
+            <h3>Paste Enverus Report</h3>
+            <button class="modal-close" onclick="document.getElementById('paste-modal').classList.remove('active')">&times;</button>
+        </div>
+        <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem">
+            Open the Enverus Permit Activity report in your browser, select all the text (Ctrl+A), copy it (Ctrl+C), and paste it below (Ctrl+V). Then click Process.
+        </p>
+        <form action="{{ url_for('paste_report') }}" method="post">
+            <textarea name="report_text" placeholder="Paste Enverus report text here..." style="min-height:300px;width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-size:0.8rem;font-family:monospace"></textarea>
+            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem"
+                    onclick="this.disabled=true;this.innerHTML='<span class=spinner></span> Processing (this may take a minute)...';this.form.submit()">
+                Process Report
+            </button>
+        </form>
     </div>
 </div>
 

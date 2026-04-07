@@ -280,6 +280,62 @@ def upload_csv():
     return redirect(url_for('dashboard'))
 
 
+# ─── Paste Report (Enverus Text) ──────────────────────────────────────────────
+
+@app.route('/paste-report', methods=['POST'])
+def paste_report():
+    """Parse pasted Enverus permit activity report text."""
+    report_text = request.form.get('report_text', '').strip()
+    if not report_text or len(report_text) < 50:
+        flash('Please paste the Enverus report text.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        from enverus_puller import parse_enverus_text, filter_targets
+        from contact_enricher import enrich_contacts
+        from outreach_db import save_rig_report, was_contacted_recently
+
+        records = parse_enverus_text(report_text)
+
+        if not records:
+            flash('Could not parse any operators from the pasted text.', 'warning')
+            return redirect(url_for('dashboard'))
+
+        week_of = _current_week()
+        save_rig_report(records, week_of)
+
+        targets = filter_targets(records)
+        new_targets = [t for t in targets['all_unique']
+                       if not was_contacted_recently(t['operator'])]
+
+        result = enrich_contacts(new_targets)
+        market_update = get_market_update()
+        email_count = 0
+
+        for contact in result['enriched']:
+            email = generate_email(contact, market_update)
+            contact_id = contact.get('id')
+            if contact_id:
+                create_outreach(contact_id, email['email_type'],
+                                email['subject'], email['body'], week_of)
+                email_count += 1
+
+        flash(
+            f"Report parsed: {len(records)} operators found, "
+            f"{len(new_targets)} new targets, "
+            f"{len(result['enriched'])} contacts enriched, "
+            f"{len(result['not_found'])} need manual research, "
+            f"{email_count} emails generated.",
+            'success'
+        )
+
+    except Exception as e:
+        logger.exception("Paste report failed")
+        flash(f"Report parsing failed: {str(e)}", 'error')
+
+    return redirect(url_for('dashboard'))
+
+
 # ─── Manual Contact Add ──────────────────────────────────────────────────────
 
 @app.route('/add-contact', methods=['POST'])
